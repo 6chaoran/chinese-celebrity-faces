@@ -12,8 +12,8 @@ crawler = Crawler()
 @click.option('--thread', default=-1, help='number of multi-process',  type=int)
 def main(thread):
     data = pd.read_csv('chinese-celebrity-faces.csv')
-    images = data['IMAGE_PATH'].unique()
-    downloaded_images = list(Path('./images').glob("*"))
+    images = data['IMAGE_PATH']
+    downloaded_images = [i.as_posix() for i in list(Path('./images').glob("*"))]
 
     print('DOWNLOAD FACE IMAGES')
     print('=' * 60)
@@ -26,6 +26,7 @@ def main(thread):
     pending = pending.rename(
         columns={'IMAGE_URL': "link", "IMAGE_PATH": "image_path"})
     urls = pending.to_dict(orient='records')
+    print(f'downloading remaining {len(urls)} images:')
 
     if thread > 1:
         with Pool(thread) as p:

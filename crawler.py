@@ -43,7 +43,11 @@ class Crawler:
             urllib.request.urlretrieve(link, image_path)
 
     def download_image(self, args):
-        return self.save_poster(**args)
+        try:
+            self.save_poster(**args)
+        except:
+            print(f"\n[error]: {args['link']}")
+        return 
 
     def get_star_list(self, url):
         soup = self.get_soup(url)
