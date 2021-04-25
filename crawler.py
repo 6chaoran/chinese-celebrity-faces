@@ -42,6 +42,9 @@ class Crawler:
         if link != "":
             urllib.request.urlretrieve(link, image_path)
 
+    def download_image(self, args):
+        return self.save_poster(**args)
+
     def get_star_list(self, url):
         soup = self.get_soup(url)
         page_list = soup.body.find_next(id="list_stars").find_all("li")
