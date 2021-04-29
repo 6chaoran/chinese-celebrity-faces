@@ -6,51 +6,55 @@ import pandas as pd
 
 
 class Crawler:
-    def __init__(self):
-        self.image_output_dir = Path("./images")
-        self.data_dir = Path('./data')
-        self.image_output_dir.mkdir(parents=True, exist_ok=True)
-        self.data_dir.mkdir(parents=True, exist_ok=True)
 
-    def get_soup(self, url):
+    def __init__(self, image_dir, data_dir, page_dir, list_dir):
+        self.IMAGE_DIR = Path(image_dir)
+        self.DATA_DIR = Path(data_dir)
+        self.PAGE_DIR = Path(page_dir)
+        self.LIST_DIR = Path(list_dir)
+        self.LIST_FILE = self.LIST_DIR.parent.joinpath('list.csv')
+        self.DATA_FILE = self.DATA_DIR.parent.joinpath('data.csv')
+        output_dirs = [self.IMAGE_DIR, self.DATA_DIR,
+                       self.PAGE_DIR, self.LIST_DIR]
+        for d in output_dirs:
+            d.mkdir(parents=True, exist_ok=True)
+
+    def _list_urls(self, pat, pages):
+        pat = urllib.parse.quote(pat)
+        urls = [f"https://www.ijq.tv/mingxing/{pat}_{page_name}.html"
+                for page_name in range(1, pages + 1)]
+        return urls
+
+    def check_pending_lists(self, test = False):
+
+        urls_saved = [i.name.replace('.csv', '.html')
+                      for i in self.LIST_DIR.glob("*.csv")]
+
+        urls = []
+        # Mainland
+        urls += self._list_urls("list_内地", 213)
+        # Hong Kong
+        urls += self._list_urls("list_香港", 8)
+        # Taiwan
+        urls += self._list_urls("list_台湾", 9)
+        # Korea
+        urls += self._list_urls("list_韩国", 20)
+        # Japan
+        urls += self._list_urls("list_日本", 12)
+        # US
+        urls += self._list_urls(f"list_美国", 27)
+
+        if test:
+            urls = urls[:2]
+
+        urls_pending = [i for i in urls if Path(i).name not in urls_saved]
+
+        return urls_pending, urls_saved
+
+    def crawl_list(self, url, save=True):
         with urllib.request.urlopen(url) as response:
             html = response.read()
         soup = BeautifulSoup(html, 'html.parser')
-        return soup
-
-    def get_info(self, soup):
-        info = soup.body.find_next(id="v-details-list").find_all('p')
-        res = {}
-        for i in info:
-            name, value = i.text.split('：', 1)
-            res[name.strip()] = value.strip()
-        return res
-
-    def get_poster(self, soup):
-        image_output_dir = self.image_output_dir
-        poster = soup.body.find_next(id="v-poster").find_next('img')
-        link = poster.get('src', '')
-        if len(link) > 0:
-            link = "https:" + link
-            image_path = image_output_dir.joinpath(Path(link).name)
-        else:
-            link = ""
-            image_path = ""
-        return link, image_path
-
-    def save_poster(self, link, image_path):
-        if link != "":
-            urllib.request.urlretrieve(link, image_path)
-
-    def download_image(self, args):
-        try:
-            self.save_poster(**args)
-        except:
-            print(f"\n[error]: {args['link']}")
-        return 
-
-    def get_star_list(self, url):
-        soup = self.get_soup(url)
         page_list = soup.body.find_next(id="list_stars").find_all("li")
         res = []
         for p in page_list:
@@ -58,37 +62,131 @@ class Crawler:
             page_url = "https://www.ijq.tv"+a.get('href', '')
             avatar_url = "https:" + a.img.get('src', '')
             name = a.img.get("alt")
-            res += [{'name': name, 'page_url': page_url, 'avatar_url': avatar_url}]
+            res += [{'name': name, 'page_url': page_url}]
+
+        if save:
+            filename = Path(url).name.replace('html', 'csv')
+            pd.DataFrame(res).to_csv(
+                self.LIST_DIR.joinpath(filename), index=False)
         return res
 
-    def crawl_page(self, url, save_img=False):
-        if len(url) > 0:
-            soup = self.get_soup(url)
-            info = self.get_info(soup)
-            poster, image_local_path = self.get_poster(soup)
-            info['image_url'] = poster
-            info['image_path'] = image_local_path.as_posix()
-            if save_img:
-                self.save_poster(poster, image_local_path)
+    def combine_list(self, test):
+        urls_pending, urls_saved = self.check_pending_lists(test)
+        if len(urls_pending) == 0:
+            print('='*60)
+            print('COMBINE LIST')
+            print('='*60)
+
+            rows = []
+            for p in tqdm(urls_saved):
+                p = self.LIST_DIR.joinpath(p.replace('.html','.csv'))
+                rows += [pd.read_csv(p)]
+            data = pd.concat(rows)
+            data.to_csv(self.LIST_FILE, index=False)
+            print(f'combined list is saved [{self.LIST_FILE.as_posix()}]')
         else:
-            info = {}
+            print('there is still pending lists')
+
+    def check_pending_pages(self, test):
+        pages = pd.read_csv(self.LIST_FILE)
+        if test:
+            pages = pages[:4]
+        urls = pages['page_url'].tolist()
+        saved_pages = [i.name for i in self.PAGE_DIR.glob('*.html')]
+        urls_pending = [i for i in urls if Path(i).name not in saved_pages]
+        return urls_pending, saved_pages
+
+    def crawl_page(self, url, save=True):
+        with urllib.request.urlopen(url) as response:
+            html = response.read()
+        filename = Path(url).name
+        if save:
+            with open(self.PAGE_DIR.joinpath(filename), 'wb') as f:
+                f.write(html)
+        return html
+
+    def check_pending_parsed_pages(self, test):
+        pages = [i.name for i in self.PAGE_DIR.glob("*.html")]
+        if test:
+            pages = pages[:4]
+        pages_parsed = [i.name.replace('.csv', '.html')
+                        for i in self.DATA_DIR.glob("*.csv")]
+        pages_pending = [i for i in pages if i not in pages_parsed]
+        return pages_pending, pages_parsed
+
+    def parse_page(self, filename, save=True):
+
+        with open(self.PAGE_DIR.joinpath(filename), 'r') as f:
+            html = f.read()
+        soup = BeautifulSoup(html, 'html.parser')
+        info = self._get_info(soup)
+        info['avatar'] = self._get_avatar(soup)
+        info['bio'] = self._get_bio(soup)
+        info['poster'] = self._get_poster(soup)
+
+        if save:
+            filename = filename.replace('.html', '.csv')
+            pd.DataFrame([info]).to_csv(
+                self.DATA_DIR.joinpath(filename), index=False)
         return info
 
-    def crawl_list(self, url):
-        page_list = self.get_star_list(url)
-        res = []
-        for p in tqdm(page_list):
-            try:
-                info = self.crawl_page(p.get('page_url', ''))
-            except:
-                print('error: ' + p.get('page_url'))
-                info = {}
-            info.update(p)
-            res += [info]
+    def combine_parsed_page(self, test):
+        pages_pending, pages_parsed = self.check_pending_parsed_pages(test)
+        if len(pages_pending) == 0:
+            rows = []
+            for d in tqdm(pages_parsed):
+                d = d.replace('.html', '.csv')
+                rows += [pd.read_csv(self.DATA_DIR.joinpath(d))]
+            data = pd.concat(rows)
+            data.to_csv(self.DATA_FILE, index = False)
+            print(f"combined parsed page is saved [{self.DATA_FILE.as_posix()}]")
+        else:
+            print("there's pending parsing page")
+            data = None
+        return data
 
-        # save result
-        list_name = Path(url).name.replace('html', 'csv')
-        res = pd.DataFrame(res)
-        res.columns = [i.replace('\xa0', '').replace('\u3000', '')
-                       for i in list(res.columns)]
-        res.to_csv(self.data_dir.joinpath(list_name), index=False)
+    def _get_info(self, soup):
+
+        info = soup.body.find_next(id="v-details-list").find_all('p')
+        res = {}
+        for i in info:
+            text = i.text
+            name, value = i.text.split('：', 1)
+            res[name.strip()] = value.strip()
+        try:
+            res['weibo'] = (info[14]).a.get('href', '')
+        except:
+            res['weibo'] = ''
+        return res
+
+    def _get_bio(self, soup):
+        try:
+            return soup.find(id="v-summary").find("div").text
+        except:
+            return ''
+
+    def _get_poster(self, soup):
+        try:
+            res = soup.find(id="v-summary")
+            res = res.find("div", {"class": "content", "class": "textindent2em"})
+            res = res.find('img').get('src', '')
+            return res
+        except:
+            return ''
+        
+
+    def _get_avatar(self, soup):
+        poster = soup.body.find_next(id="v-poster").find_next('img')
+        link = poster.get('src', '')
+        if len(link) > 0:
+            link = "https:" + link
+        else:
+            link = ""
+        return link
+
+    def save_image(self,link):
+        image_path = self.IMAGE_DIR
+        if link != "":
+            urllib.request.urlretrieve(link, image_path)
+
+

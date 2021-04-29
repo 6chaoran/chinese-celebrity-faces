@@ -1,33 +1,90 @@
-from time import sleep
-import random
 from pathlib import Path
 import click
+from multiprocessing import Pool
+from tqdm import tqdm
 from crawler import Crawler
-crawler = Crawler()
+import pandas as pd
+
+crawler = Crawler(image_dir='./images',
+                  data_dir='./data',
+                  list_dir='./lists',
+                  page_dir='./pages')
+
+
+def crawl_page(thread, test):
+    urls_pending, saved_pages = crawler.check_pending_pages(test)
+    print("CRAWLING PAGE")
+    print("=" * 60)
+    print(f"downloaded {len(saved_pages)} pages")
+    print(f"downloading remaining {len(urls_pending)} pages")
+    print("=" * 60)
+
+    # crawling
+    if thread > 1:
+        with Pool(thread) as p:
+            _ = list(tqdm(p.imap_unordered(
+                crawler.crawl_page, urls_pending), total=len(urls_pending)))
+    else:
+        for url in tqdm(urls_pending):
+            _ = crawler.crawl_page(url)
+
+
+def parse_page(thread, test):
+    urls_pending, saved_pages = crawler.check_pending_parsed_pages(test)
+    print("PARSING PAGE")
+    print("=" * 60)
+    print(f"parsed {len(saved_pages)} pages")
+    print(f"parsing remaining {len(urls_pending)} pages")
+    print("=" * 60)
+
+    # crawling
+    if thread > 1:
+        with Pool(thread) as p:
+            _ = list(tqdm(p.imap_unordered(
+                crawler.parse_page, urls_pending), total=len(urls_pending)))
+    else:
+        for url in tqdm(urls_pending):
+            _ = crawler.parse_page(url)
+
+    crawler.combine_parsed_page(test)
+
+
+def crawl_list(thread, test):
+    urls_pending, urls_saved = crawler.check_pending_lists(test)
+
+    print("CRAWLING LIST")
+    print("=" * 60)
+    print(f"downloaded {len(urls_saved)} lists")
+    print(f"downloading remaining {len(urls_pending)} lists")
+    print("=" * 60)
+
+    # crawling
+    if thread > 1:
+        with Pool(thread) as p:
+            _ = list(tqdm(p.imap_unordered(
+                crawler.crawl_list, urls_pending), total=len(urls_pending)))
+    else:
+        for url in tqdm(urls_pending):
+            _ = crawler.crawl_list(url)
+
+    # combine
+    crawler.combine_list(test)
 
 
 @click.command()
-@click.option('--start', default=-1, help='start page number',  type=int)
-@click.option('--end', default=214, help='end page number', type=int)
-def main(start, end):
+@click.option('--target', default='list',  help='which target to crawl')
+@click.option('--thread', default=-1, help='number of multi-process',  type=int)
+@click.option('--test', is_flag=True, help='test mode')
+def main(target, thread, test):
 
-    saved_list = list(Path('./data').glob("*.csv"))
-    saved_list = [i.as_posix() for i in saved_list]
-    saved_page_num = [int(i.split('_', 2)[-1].replace('.csv', ''))
-                      for i in saved_list]
-
-    if start < 0:
-        start = max(saved_page_num) + 1
-
-    for page_name in range(start, end):
-
-        url = f"https://www.ijq.tv/mingxing/list_%E5%86%85%E5%9C%B0_{page_name}.html"
-        print(f'crawling page {page_name}')
-        _ = crawler.crawl_list(url)
-        # rest for a random interval
-        rest_interval = random.randint(1, 6)
-        print(f"rest {rest_interval}s...")
-        sleep(rest_interval)
+    if target == 'list':
+        crawl_list(thread, test)
+    elif target == 'page':
+        crawl_page(thread, test)
+    elif target == 'parse':
+        parse_page(thread, test)
+    else:
+        pass
 
 
 if __name__ == '__main__':

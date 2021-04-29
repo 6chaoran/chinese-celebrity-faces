@@ -1,5 +1,10 @@
 # Chinese Celebrity Faces
 
+
+* chinese-celebrity-faces.csv: meta data
+* images: faces
+
+
 ## Get Started
 
 ### Download the images from Web
@@ -7,9 +12,6 @@
 # number of thread depends on machine spec
 python download.py --thread 8 
 ```
-
-* chinese-celebrity-faces.csv: meta data
-* images: faces
 
 ### Download from Google Drive
 

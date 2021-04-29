@@ -4,3 +4,6 @@
 *.pyc
 .DS_store
 *__pycache__
+lists
+pages
+data
