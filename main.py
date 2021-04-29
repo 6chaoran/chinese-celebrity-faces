@@ -49,6 +49,23 @@ def parse_page(thread, test):
     crawler.combine_parsed_page(test)
 
 
+def download_images(thread, test):
+    images_pending, images_saved = crawler.check_pending_images(test)
+    print("DOWNLOADING IMAGES")
+    print("=" * 60)
+    print(f"downloaded {len(images_saved)} images")
+    print(f"downloading remaining {len(images_pending)} images")
+    print("=" * 60)
+
+    if thread > 1:
+        with Pool(thread) as p:
+            _ = list(tqdm(p.imap_unordered(
+                crawler.save_image, images_pending), total=len(images_pending)))
+    else:
+        for url in tqdm(images_pending):
+            _ = crawler.save_image(url)
+
+
 def crawl_list(thread, test):
     urls_pending, urls_saved = crawler.check_pending_lists(test)
 
@@ -83,9 +100,10 @@ def main(target, thread, test):
         crawl_page(thread, test)
     elif target == 'parse':
         parse_page(thread, test)
+    elif target == 'image':
+        download_images(thread, test)
     else:
         pass
-
 
 if __name__ == '__main__':
     main()

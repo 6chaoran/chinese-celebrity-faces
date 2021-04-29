@@ -1,4 +1,4 @@
-/.ipynb_checkpoints
+*.ipynb_checkpoints
 /images
 /tmp
 *.pyc
@@ -7,3 +7,4 @@
 lists
 pages
 data
+*/tmp

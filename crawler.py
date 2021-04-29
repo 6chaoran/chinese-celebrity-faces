@@ -25,7 +25,7 @@ class Crawler:
                 for page_name in range(1, pages + 1)]
         return urls
 
-    def check_pending_lists(self, test = False):
+    def check_pending_lists(self, test=False):
 
         urls_saved = [i.name.replace('.csv', '.html')
                       for i in self.LIST_DIR.glob("*.csv")]
@@ -79,7 +79,7 @@ class Crawler:
 
             rows = []
             for p in tqdm(urls_saved):
-                p = self.LIST_DIR.joinpath(p.replace('.html','.csv'))
+                p = self.LIST_DIR.joinpath(p.replace('.html', '.csv'))
                 rows += [pd.read_csv(p)]
             data = pd.concat(rows)
             data.to_csv(self.LIST_FILE, index=False)
@@ -138,15 +138,28 @@ class Crawler:
                 d = d.replace('.html', '.csv')
                 rows += [pd.read_csv(self.DATA_DIR.joinpath(d))]
             data = pd.concat(rows)
-            data.to_csv(self.DATA_FILE, index = False)
-            print(f"combined parsed page is saved [{self.DATA_FILE.as_posix()}]")
+            data.to_csv(self.DATA_FILE, index=False)
+            print(
+                f"combined parsed page is saved [{self.DATA_FILE.as_posix()}]")
         else:
             print("there's pending parsing page")
             data = None
         return data
 
-    def _get_info(self, soup):
+    def check_pending_images(self, test):
+        data = pd.read_csv('./chinese-celebrity-faces.csv')
+        images = data[['AVATAR', 'AVATAR_ID']].rename(columns={
+            'AVATAR': 'url',
+            'AVATAR_ID': 'filename'
+        }).to_dict(orient='records')
+        if test:
+            images = images[:4]
+        images_saved = [i.name for i in Path(self.IMAGE_DIR).glob('*')]
+        images_pending = [
+            i for i in images if i['filename'] not in images_saved]
+        return images_pending, images_saved
 
+    def _get_info(self, soup):
         info = soup.body.find_next(id="v-details-list").find_all('p')
         res = {}
         for i in info:
@@ -168,12 +181,12 @@ class Crawler:
     def _get_poster(self, soup):
         try:
             res = soup.find(id="v-summary")
-            res = res.find("div", {"class": "content", "class": "textindent2em"})
+            res = res.find("div", {"class": "content",
+                           "class": "textindent2em"})
             res = res.find('img').get('src', '')
             return res
         except:
             return ''
-        
 
     def _get_avatar(self, soup):
         poster = soup.body.find_next(id="v-poster").find_next('img')
@@ -184,9 +197,10 @@ class Crawler:
             link = ""
         return link
 
-    def save_image(self,link):
-        image_path = self.IMAGE_DIR
-        if link != "":
-            urllib.request.urlretrieve(link, image_path)
+    def _save_image(self, url, filename):
+        image_path = self.IMAGE_DIR.joinpath(filename)
+        if url != "":
+            urllib.request.urlretrieve(url, image_path)
 
-
+    def save_image(self, args):
+        return self._save_image(**args)
