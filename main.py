@@ -59,8 +59,11 @@ def download_images(thread, test):
 
     if thread > 1:
         with Pool(thread) as p:
-            _ = list(tqdm(p.imap_unordered(
+            err = list(tqdm(p.imap_unordered(
                 crawler.save_image, images_pending), total=len(images_pending)))
+        with open('download_error.dat', 'w') as f:
+            f.write('\n'.join(err))
+
     else:
         for url in tqdm(images_pending):
             _ = crawler.save_image(url)

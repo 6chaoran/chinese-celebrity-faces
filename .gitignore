@@ -8,3 +8,6 @@ lists
 pages
 data
 */tmp
+*.zip
+images_
+_*

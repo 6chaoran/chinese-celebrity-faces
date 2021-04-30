@@ -203,4 +203,9 @@ class Crawler:
             urllib.request.urlretrieve(url, image_path)
 
     def save_image(self, args):
-        return self._save_image(**args)
+        try:
+            self._save_image(**args)
+        except:
+            print(f'[error]: {args["url"]}')
+            return args['url']
+        return ''
