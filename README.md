@@ -1,9 +1,10 @@
 # Chinese Celebrity Faces
 
+![](./img/BMI-FACES.png)
 
 * chinese-celebrity-faces.csv: meta data
-* images: faces
-
+* images: original images
+* faces: aligned images (using MTCNN)
 
 ### Download from Google Drive
 
@@ -12,5 +13,8 @@
 
 ```
 pip install gdown
-gdown https://drive.google.com/uc?id=14CsfiSwhBdV_STYG4TqNHnb7Yli27Q7J
+# faces.zip
+gdown https://drive.google.com/uc?id=1KekADu8uirNsJ3VxgcE2SovVddj-k794
+# images.zip
+gdown https://drive.google.com/uc?id=14iO6Xu1gFmMUjrr1IggSE1WxonyjyJCb
 ```
